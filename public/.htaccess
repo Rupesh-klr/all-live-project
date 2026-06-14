@@ -1,0 +1,15 @@
+# React SPA — redirect every non-file, non-folder request to index.html
+# Works on Apache and LiteSpeed (Hostinger default engine).
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Pass requests for real files and directories straight through
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+
+  # Everything else → index.html (React Router handles the path)
+  RewriteRule . /index.html [L]
+</IfModule>
