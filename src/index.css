@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap');
+
+@layer base {
+  :root {
+    --bg:        #ffffff;
+    --bg-2:      #f8fafc;
+    --border:    #e2e8f0;
+    --text:      #0f172a;
+    --text-muted:#64748b;
+    --accent:    #6366f1;
+    --accent-dk: #4f46e5;
+  }
+  .dark {
+    --bg:        #11111b;
+    --bg-2:      #181825;
+    --border:    #2a2a3e;
+    --text:      #cdd6f4;
+    --text-muted:#6c7086;
+    --accent:    #89b4fa;
+    --accent-dk: #74c7ec;
+  }
+  body {
+    @apply bg-[var(--bg)] text-[var(--text)] transition-colors duration-200;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  * { @apply border-[var(--border)]; }
+}
+
+@layer components {
+  .card {
+    @apply bg-[var(--bg-2)] border border-[var(--border)] rounded-xl shadow-sm;
+  }
+  .btn-primary {
+    @apply bg-brand-500 hover:bg-brand-600 text-white font-semibold
+           px-4 py-2 rounded-lg transition-all duration-150 active:scale-95
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-ghost {
+    @apply border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]
+           hover:bg-[var(--bg-2)] px-4 py-2 rounded-lg transition-all duration-150;
+  }
+  .input {
+    @apply w-full bg-[var(--bg)] border border-[var(--border)]
+           text-[var(--text)] placeholder:text-[var(--text-muted)]
+           rounded-lg px-3 py-2 text-sm outline-none
+           focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20
+           transition-all duration-150;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1 text-[10px] font-mono font-bold
+           uppercase tracking-widest px-2 py-0.5 rounded-full;
+  }
+  .tag-admin   { @apply badge bg-red-500/10 text-red-500 border border-red-500/20; }
+  .tag-manager { @apply badge bg-amber-500/10 text-amber-500 border border-amber-500/20; }
+  .tag-viewer  { @apply badge bg-green-500/10 text-green-500 border border-green-500/20; }
+  .tag-guest   { @apply badge bg-gray-500/10 text-gray-500 border border-gray-500/20; }
+}
