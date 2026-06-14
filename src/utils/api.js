@@ -56,8 +56,8 @@ api.interceptors.response.use(
       } catch (_e) {
         queue.forEach(p => p.reject(_e))
         queue = []
-        localStorage.clear()
-        window.location.href = '/login'
+        // Fire event instead of hard-redirecting — AuthContext shows SessionExpiredModal
+        window.dispatchEvent(new CustomEvent('auth:session-expired'))
       } finally {
         refreshing = false
       }

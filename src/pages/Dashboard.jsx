@@ -1,53 +1,18 @@
 import { useNavigate } from 'react-router-dom'
-import { Terminal, Sun, Moon, LogOut, Network, Layers, Landmark, MessageSquare, ExternalLink } from 'lucide-react'
+import { Terminal, Sun, Moon, LogOut, ExternalLink } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { Badge } from '../components/Badge/Badge'
 import { Tooltip } from '../components/Tooltip/Tooltip'
-
-const MODULES = [
-  {
-    name: 'Telecom Network Optimizer',
-    slug: 'telecom-optimizer',
-    icon: Network,
-    color: '#06b6d4',
-    tech: ['Python', 'Graph Theory', 'React'],
-    summary: 'High-efficiency routing algorithm — 130% increase in path detection speed.',
-    highlights: ['130% faster path detection', '40% better latency analysis'],
-  },
-  {
-    name: 'VectorShift — RAG Pipeline Builder',
-    slug: 'vectorshift',
-    icon: Layers,
-    color: '#8b5cf6',
-    tech: ['React', 'FastAPI', 'Vector DBs'],
-    summary: 'Interactive DAG-based AI workflow orchestration engine.',
-    highlights: ['DAG pipeline builder', 'High-performance RAG execution'],
-  },
-  {
-    name: 'Distributed Banking Core',
-    slug: 'banking-core',
-    icon: Landmark,
-    color: '#f59e0b',
-    tech: ['Spring Boot', 'Kafka', 'Microservices'],
-    summary: 'Fault-tolerant banking system — 99.9% reliability.',
-    highlights: ['Kafka event streaming', 'OAuth2 + JWT security'],
-  },
-  {
-    name: 'Automated WhatsApp CRM Engine',
-    slug: 'whatsapp-crm',
-    icon: MessageSquare,
-    color: '#22c55e',
-    tech: ['Node.js', 'Spring Boot', 'WebHooks'],
-    summary: 'Scalable CRM with WhatsApp Business API + event-driven webhooks.',
-    highlights: ['High-concurrency webhooks', 'Custom workflow automation'],
-  },
-]
+import { APP_CONFIG } from '../config/app.config'
+import { MODULES } from '../modules/registry'
 
 export function Dashboard() {
   const { user, logout } = useAuth()
   const { toggle, isDark } = useTheme()
   const navigate = useNavigate()
+
+  const [brandHead, brandTail] = APP_CONFIG.brandName.split('.')
 
   return (
     <div className="min-h-screen bg-[var(--bg)]">
@@ -57,7 +22,7 @@ export function Dashboard() {
           <div className="flex items-center gap-2">
             <Terminal size={18} className="text-brand-500" />
             <span className="font-mono font-bold text-sm">
-              portfolio<span className="text-brand-500">.hub</span>
+              {brandHead}<span className="text-brand-500">.{brandTail || 'hub'}</span>
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -85,31 +50,34 @@ export function Dashboard() {
           <p className="font-mono text-xs text-brand-500 mb-2">
             <span className="text-green-500">❯</span> Hello, {user?.displayName || user?.username}
           </p>
-          <h1 className="text-3xl font-bold text-[var(--text)] mb-2">
-            Portfolio Hub
-          </h1>
+          <h1 className="text-3xl font-bold text-[var(--text)] mb-2">Portfolio Hub</h1>
           <p className="text-[var(--text-muted)] text-sm max-w-lg">
             Production-grade projects demonstrating distributed systems, AI pipelines,
-            real-time data, and enterprise architecture — built to 6-year engineering standards.
+            real-time data, and enterprise architecture — {APP_CONFIG.tagline}.
           </p>
         </div>
 
-        {/* Module cards */}
+        {/* Module cards — folder-driven from the registry */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {MODULES.map(mod => {
             const Icon = mod.icon
+            const soon = mod.status === 'soon'
             return (
               <button
                 key={mod.slug}
-                onClick={() => navigate(`/${mod.slug}`)}
+                onClick={() => !soon && navigate(mod.publicPath)}
+                disabled={soon}
                 className="card p-5 text-left group hover:border-brand-500/50 hover:shadow-lg
-                           hover:shadow-brand-500/5 transition-all duration-200 hover:-translate-y-0.5"
+                           hover:shadow-brand-500/5 transition-all duration-200 hover:-translate-y-0.5
+                           disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0"
               >
                 <div className="flex items-start justify-between mb-3">
                   <div className="p-2 rounded-lg" style={{ background: `${mod.color}18` }}>
                     <Icon size={20} style={{ color: mod.color }} />
                   </div>
-                  <ExternalLink size={14} className="text-[var(--text-muted)] opacity-0 group-hover:opacity-100 transition-opacity" />
+                  {soon
+                    ? <span className="font-mono text-[9px] uppercase px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20">soon</span>
+                    : <ExternalLink size={14} className="text-[var(--text-muted)] opacity-0 group-hover:opacity-100 transition-opacity" />}
                 </div>
 
                 <h2 className="font-semibold text-[var(--text)] text-sm mb-1">{mod.name}</h2>

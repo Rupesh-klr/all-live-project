@@ -1,7 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 
-/** Protects any route — redirects to /login if not authenticated */
 export function AuthGuard({ children, requiredRole, requiredModule }) {
   const { isAuthenticated, loading, hasRole, canAccess } = useAuth()
   const location = useLocation()
@@ -15,7 +14,10 @@ export function AuthGuard({ children, requiredRole, requiredModule }) {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />
+    // Redirect to the module-specific login if we know the module,
+    // so after login the user lands on that module's dashboard.
+    const loginPath = requiredModule ? `/${requiredModule}/login` : '/login'
+    return <Navigate to={loginPath} state={{ from: location }} replace />
   }
 
   if (requiredRole && !hasRole(requiredRole)) {

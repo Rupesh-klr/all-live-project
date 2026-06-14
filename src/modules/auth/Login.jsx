@@ -8,6 +8,7 @@ import { TextBox } from '../../components/TextBox/TextBox'
 import { Button } from '../../components/Button/Button'
 import { Badge } from '../../components/Badge/Badge'
 import api from '../../utils/api'
+import { loadSnapshot, clearSnapshot } from '../../utils/sessionSnapshot'
 
 // ── Module banner item ────────────────────────────────────────────────────────
 function BannerItem({ mod }) {
@@ -49,7 +50,7 @@ function ModulesBanner({ modules }) {
 }
 
 // ── Login page ────────────────────────────────────────────────────────────────
-export function Login() {
+export function Login({ defaultRedirect = '/dashboard' }) {
   const { login, guestLogin, isAuthenticated } = useAuth()
   const { toggle, isDark } = useTheme()
   const navigate = useNavigate()
@@ -62,7 +63,14 @@ export function Login() {
   const [modules, setModules]       = useState([])
   const [errors, setErrors]         = useState({})
 
-  const from = location.state?.from?.pathname || '/dashboard'
+  const from = location.state?.from?.pathname || defaultRedirect
+
+  // If this is a module-scoped login page, guest goes back to that module's public page
+  // e.g. defaultRedirect = '/telecom-optimizer/dashboard' → guestTarget = '/telecom-optimizer'
+  // e.g. defaultRedirect = '/dashboard' (root) → guestTarget = '/dashboard'
+  const guestTarget = defaultRedirect !== '/dashboard'
+    ? defaultRedirect.replace('/dashboard', '') || '/dashboard'
+    : '/dashboard'
 
   // Redirect if already logged in
   useEffect(() => { if (isAuthenticated) navigate(from, { replace: true }) }, [isAuthenticated])
@@ -87,9 +95,23 @@ export function Login() {
     if (!validate()) return
     setLoading(true)
     try {
-      const user = await login(identifier.trim(), password)
-      toast.success(`Welcome back, ${user.displayName || user.username}!`)
-      navigate(from, { replace: true })
+      const u = await login(identifier.trim(), password)
+      toast.success(`Welcome back, ${u.displayName || u.username}!`)
+
+      // Determine where to send the user:
+      // 1. AuthGuard redirect (location.state.from) — highest priority
+      // 2. Saved snapshot from before session expired — restore that page
+      // 3. defaultRedirect prop (module-specific or /dashboard)
+      const snap = loadSnapshot()
+      const target = location.state?.from?.pathname || snap?.pathname || from
+
+      navigate(target, { replace: true })
+
+      // Restore scroll position after the new page settles in the DOM
+      if (snap?.scrollY && snap.pathname === target) {
+        setTimeout(() => window.scrollTo({ top: snap.scrollY, behavior: 'instant' }), 150)
+      }
+      clearSnapshot()
     } catch (err) {
       toast.error(err.response?.data?.message || 'Login failed')
     } finally {
@@ -100,9 +122,9 @@ export function Login() {
   async function handleGuest() {
     setGuestLoading(true)
     try {
-      const user = await guestLogin()
-      toast.success(`Guest session started — your account expires in 7 days`)
-      navigate('/dashboard', { replace: true })
+      await guestLogin()
+      toast.success('Guest session started — your account expires in 7 days')
+      navigate(guestTarget, { replace: true })
     } catch (err) {
       toast.error(err.response?.data?.message || 'Could not start guest session')
     } finally {
