@@ -27,6 +27,9 @@ export const VECTORSHIFT = {
     pipelines:  `${apiBase}/pipelines`,
     run:        (id) => `${apiBase}/pipelines/${id}/run`,
     create:     `${apiBase}/pipelines`,
+    knowledge:  `${apiBase}/knowledge`,
+    models:     `${apiBase}/models`,
+    metrics:    `${apiBase}/metrics`,
   },
   // Offline fallbacks so the builder still renders if the API is down.
   builderFallback: {

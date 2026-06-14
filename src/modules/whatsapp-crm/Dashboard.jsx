@@ -1,45 +1,84 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   MessageSquare, Send, Lock, RefreshCw, GitBranch,
-  ExternalLink, Users, Play, Pause, ChevronDown,
+  ExternalLink, Users, Play, Pause, BarChart2, Megaphone,
+  FileText, Search, Plus, CheckCircle, Circle,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { DashboardLayout } from '../common/DashboardLayout'
+import { SubTabs } from '../common/SubTabs'
 import { Button } from '../../components/Button/Button'
 import api from '../../utils/api'
 import { WHATSAPP as W } from './constants'
 
-const TABS = ['Inbox', 'Workflows']
+const TABS = [
+  { id: 'inbox',     label: 'Inbox',     icon: MessageSquare },
+  { id: 'contacts',  label: 'Contacts',  icon: Users        },
+  { id: 'campaigns', label: 'Campaigns', icon: Megaphone    },
+  { id: 'templates', label: 'Templates', icon: FileText     },
+  { id: 'analytics', label: 'Analytics', icon: BarChart2    },
+]
 
 const fmt = (ts) => {
   if (!ts) return ''
-  const diff = Date.now() - ts
-  if (diff < 60_000) return 'now'
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m`
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h`
-  return `${Math.floor(diff / 86_400_000)}d`
+  const d = Date.now() - ts
+  if (d < 60000) return 'now'
+  if (d < 3600000) return `${Math.floor(d / 60000)}m`
+  if (d < 86400000) return `${Math.floor(d / 3600000)}h`
+  return `${Math.floor(d / 86400000)}d`
 }
 
+const audienceLabel = { all: 'All contacts', window_open: 'Window open', window_closed: 'Window closed' }
+
 export function WhatsAppDashboard() {
-  const [tab, setTab] = useState('Inbox')
-  const [contacts, setContacts] = useState(W.demoContacts)
-  const [activeId, setActiveId] = useState(W.demoContacts[0]?.id)
-  const [messages, setMessages] = useState([])
-  const [windowOpen, setWindowOpen] = useState(true)
+  const [activeTab, setActiveTab] = useState('inbox')
+
+  // ── Shared data ────────────────────────────────────────────────────────────
+  const [contacts,  setContacts]  = useState(W.demoContacts)
   const [templates, setTemplates] = useState(W.demoTemplates)
   const [workflows, setWorkflows] = useState(W.demoWorkflows)
-  const [live, setLive] = useState(false)
-  const [composerText, setComposerText] = useState('')
-  const [selectedTemplate, setSelectedTemplate] = useState('')
-  const [sending, setSending] = useState(false)
-  const [simulating, setSimulating] = useState(false)
+  const [campaigns, setCampaigns] = useState(W.demoCampaigns)
+  const [live,      setLive]      = useState(false)
+
+  // ── Inbox state ────────────────────────────────────────────────────────────
+  const [activeId,        setActiveId]        = useState(W.demoContacts[0]?.id)
+  const [messages,        setMessages]        = useState([])
+  const [windowOpen,      setWindowOpen]      = useState(true)
+  const [composerText,    setComposerText]    = useState('')
+  const [selectedTpl,     setSelectedTpl]     = useState('')
+  const [sending,         setSending]         = useState(false)
+  const [simulating,      setSimulating]      = useState(false)
   const threadRef = useRef(null)
 
-  const loadContacts = useCallback(async () => {
-    try {
-      const { data } = await api.get(W.endpoints.contacts)
-      if (data?.data) { setContacts(data.data); setLive(true) }
-    } catch { setLive(false) }
+  // ── Contacts state ─────────────────────────────────────────────────────────
+  const [contactSearch, setContactSearch] = useState('')
+  const [windowFilter,  setWindowFilter]  = useState('all')
+
+  // ── Campaigns state ────────────────────────────────────────────────────────
+  const [campForm,    setCampForm]    = useState({ name: '', templateId: 't_reengage', audience: 'all' })
+  const [creating,    setCreating]    = useState(false)
+  const [sending2,    setSending2]    = useState(null)
+
+  // ── Analytics state ────────────────────────────────────────────────────────
+  const [analytics, setAnalytics] = useState(null)
+
+  // ── Initial load ───────────────────────────────────────────────────────────
+  useEffect(() => {
+    (async () => {
+      try {
+        const [cRes, tRes, wRes, campRes] = await Promise.all([
+          api.get(W.endpoints.contacts),
+          api.get(W.endpoints.templates),
+          api.get(W.endpoints.workflows),
+          api.get(W.endpoints.campaigns),
+        ])
+        if (cRes.data?.data)    setContacts(cRes.data.data)
+        if (tRes.data?.data)    setTemplates(tRes.data.data)
+        if (wRes.data?.data)    setWorkflows(wRes.data.data)
+        if (campRes.data?.data) setCampaigns(campRes.data.data)
+        setLive(true)
+      } catch { setLive(false) }
+    })()
   }, [])
 
   const loadMessages = useCallback(async (id) => {
@@ -48,314 +87,477 @@ export function WhatsAppDashboard() {
       const { data } = await api.get(W.endpoints.messages(id))
       setMessages(data.data.messages || [])
       setWindowOpen(data.data.windowOpen)
-      setContacts(prev => prev.map(c => c.id === id ? { ...c, unread: 0 } : c))
     } catch {
+      const c = contacts.find(x => x.id === id)
       setMessages([])
+      setWindowOpen(c?.windowOpen ?? true)
     }
-  }, [])
+  }, [contacts])
 
-  const loadTemplates = useCallback(async () => {
-    try {
-      const { data } = await api.get(W.endpoints.templates)
-      if (data?.data) setTemplates(data.data)
-    } catch {}
-  }, [])
-
-  const loadWorkflows = useCallback(async () => {
-    try {
-      const { data } = await api.get(W.endpoints.workflows)
-      if (data?.data) setWorkflows(data.data)
-    } catch {}
-  }, [])
-
-  useEffect(() => { loadContacts(); loadTemplates(); loadWorkflows() }, [loadContacts, loadTemplates, loadWorkflows])
-
-  useEffect(() => { if (activeId) loadMessages(activeId) }, [activeId, loadMessages])
+  useEffect(() => { loadMessages(activeId) }, [activeId])
 
   useEffect(() => {
     if (threadRef.current) threadRef.current.scrollTop = threadRef.current.scrollHeight
   }, [messages])
 
-  async function sendMsg() {
-    if (!activeId) return
+  useEffect(() => {
+    if (activeTab === 'analytics') loadAnalytics()
+  }, [activeTab])
+
+  // ── Inbox actions ──────────────────────────────────────────────────────────
+  async function sendMessage() {
+    if (!windowOpen && !selectedTpl) return
     setSending(true)
     try {
-      const payload = windowOpen
-        ? { type: 'text', text: composerText }
-        : { type: 'template', templateId: selectedTemplate }
-      const { data } = await api.post(W.endpoints.messages(activeId), payload)
-      setMessages(prev => [...prev, data.data.message])
+      const body = windowOpen
+        ? { type: 'text', text: composerText.trim() }
+        : { type: 'template', templateId: selectedTpl }
+      const { data } = await api.post(W.endpoints.messages(activeId), body)
+      setMessages(m => [...m, data.data.message])
       setWindowOpen(data.data.windowOpen)
       setComposerText('')
-      toast.success('Sent')
+      setContacts(cs => cs.map(c => c.id === activeId
+        ? { ...c, preview: data.data.message.text, lastTs: data.data.message.ts } : c))
     } catch (err) {
-      if (err.response?.status === 403) toast.error('Window closed — select a template instead')
-      else toast.error(err.response?.data?.message || 'Send failed — start the backend')
-    } finally {
-      setSending(false)
-    }
+      toast.error(err.response?.data?.message || 'Send failed')
+    } finally { setSending(false) }
   }
 
-  async function simulateInbound() {
-    if (!activeId) return
+  async function simInbound() {
     setSimulating(true)
     try {
-      const { data } = await api.post(W.endpoints.inbound(activeId), { text: 'Yes, please continue 👍' })
-      setMessages(prev => [...prev, data.data.message])
+      const { data } = await api.post(W.endpoints.inbound(activeId))
+      setMessages(m => [...m, data.data.message])
       setWindowOpen(true)
-      setContacts(prev => prev.map(c => c.id === activeId ? { ...c, windowOpen: true } : c))
-      toast.success('Inbound simulated — 24h window reopened')
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Simulate failed — start the backend')
-    } finally {
-      setSimulating(false)
-    }
+      setContacts(cs => cs.map(c => c.id === activeId ? { ...c, windowOpen: true } : c))
+    } catch { toast.error('Sim inbound failed') }
+    finally { setSimulating(false) }
   }
 
+  // ── Workflow toggle ────────────────────────────────────────────────────────
   async function toggleWorkflow(id) {
     try {
       const { data } = await api.patch(W.endpoints.toggleWorkflow(id))
-      setWorkflows(prev => prev.map(w => w.id === id ? data.data : w))
-    } catch {
-      toast.error('Toggle failed — start the backend')
-    }
+      setWorkflows(ws => ws.map(w => w.id === id ? data.data : w))
+    } catch { toast.error('Toggle failed') }
+  }
+
+  // ── Campaign actions ───────────────────────────────────────────────────────
+  async function createCampaign() {
+    if (!campForm.name.trim()) return toast.error('Campaign name is required')
+    setCreating(true)
+    try {
+      const { data } = await api.post(W.endpoints.campaigns, campForm)
+      setCampaigns(cs => [data.data, ...cs])
+      setCampForm({ name: '', templateId: 't_reengage', audience: 'all' })
+      toast.success('Campaign created')
+    } catch (err) { toast.error(err.response?.data?.message || 'Create failed') }
+    finally { setCreating(false) }
+  }
+
+  async function sendCampaign(id) {
+    setSending2(id)
+    try {
+      const { data } = await api.patch(W.endpoints.sendCampaign(id))
+      setCampaigns(cs => cs.map(c => c.id === id ? data.data : c))
+      toast.success(`Sent to ${data.data.sentCount} contacts`)
+    } catch (err) { toast.error(err.response?.data?.message || 'Send failed') }
+    finally { setSending2(null) }
+  }
+
+  // ── Analytics ──────────────────────────────────────────────────────────────
+  async function loadAnalytics() {
+    try {
+      const { data } = await api.get(W.endpoints.analytics)
+      setAnalytics(data.data)
+    } catch { /* offline — analytics won't show */ }
   }
 
   const activeContact = contacts.find(c => c.id === activeId)
+  const filteredContacts = contacts.filter(c => {
+    const matchSearch = c.name.toLowerCase().includes(contactSearch.toLowerCase()) || c.phone.includes(contactSearch)
+    const matchWindow = windowFilter === 'all' ? true : windowFilter === 'open' ? c.windowOpen : !c.windowOpen
+    return matchSearch && matchWindow
+  })
 
   return (
     <DashboardLayout
-      slug={W.slug}
-      title={W.name}
-      subtitle="Live WhatsApp inbox — send free-form text inside the 24h window, approved templates outside it."
+      slug={W.slug} title={W.name}
+      subtitle="WhatsApp Business API — 24h window enforcement, bulk campaigns, no-code workflow automation."
       actions={
-        <a href={W.liveDemoUrl} target={W.liveDemoUrl?.startsWith('http') ? '_blank' : undefined} rel="noreferrer">
+        <a href={W.liveDemoUrl} target={W.liveDemoUrl.startsWith('http') ? '_blank' : undefined} rel="noreferrer">
           <Button variant="outline" icon={ExternalLink} iconPos="right">Live Demo</Button>
         </a>
       }
     >
-      <div className="max-w-6xl space-y-6">
-
-        {/* Live banner */}
-        <div className="card p-4 flex items-center gap-3 border-l-2" style={{ borderLeftColor: W.color }}>
+      <div className="max-w-6xl">
+        {/* Status banner */}
+        <div className="card p-4 flex items-center gap-3 border-l-2 mb-6" style={{ borderLeftColor: W.color }}>
           <MessageSquare size={16} style={{ color: W.color }} />
-          <p className="text-xs text-[var(--text-muted)] flex-1">
-            API at <span className="font-mono text-[var(--text)]">{W.apiBase}</span> — 24h window enforced server-side; free-form blocked outside it, template required.
-          </p>
-          <span className="flex items-center gap-1.5">
+          <p className="text-sm text-[var(--text)]">WhatsApp 24h window · inbox · campaigns · workflows</p>
+          <div className="ml-auto flex items-center gap-1.5">
             <span className={`w-1.5 h-1.5 rounded-full ${live ? 'bg-green-500 animate-pulse' : 'bg-amber-500'}`} />
-            <span className="font-mono text-[10px] text-[var(--text-muted)] uppercase tracking-widest">{live ? 'api live' : 'offline'}</span>
-          </span>
+            <span className="font-mono text-[10px] text-[var(--text-muted)] uppercase">{live ? 'API live' : 'demo mode'}</span>
+          </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-1 border-b border-[var(--border)]">
-          {TABS.map(t => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`px-4 py-2 text-xs font-mono font-bold uppercase tracking-widest border-b-2 -mb-px transition-colors ${
-                tab === t ? '' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text)]'
-              }`}
-              style={tab === t ? { borderBottomColor: W.color, color: W.color, borderBottom: `2px solid ${W.color}` } : {}}
-            >
-              <span className="flex items-center gap-1.5">
-                {t === 'Inbox' ? <MessageSquare size={11} /> : <GitBranch size={11} />}
-                {t}
-              </span>
-            </button>
-          ))}
-        </div>
+        <SubTabs tabs={TABS} active={activeTab} onSelect={setActiveTab} color={W.color} />
 
-        {/* ── INBOX TAB ── */}
-        {tab === 'Inbox' && (
-          <div className="card overflow-hidden" style={{ height: 560 }}>
-            <div className="flex h-full">
-
-              {/* Contact list */}
-              <div className="w-72 shrink-0 border-r border-[var(--border)] flex flex-col overflow-y-auto">
-                <div className="px-3 py-2.5 border-b border-[var(--border)] shrink-0">
-                  <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-[var(--text-muted)] flex items-center gap-1.5">
-                    <Users size={10} /> Contacts ({contacts.length})
-                  </span>
-                </div>
+        {/* ── Tab: Inbox ── */}
+        {activeTab === 'inbox' && (
+          <div className="flex gap-0 border border-[var(--border)] rounded-xl overflow-hidden" style={{ height: 520 }}>
+            {/* Contact list */}
+            <div className="w-72 shrink-0 border-r border-[var(--border)] flex flex-col">
+              <div className="p-3 border-b border-[var(--border)]">
+                <span className="text-xs font-bold text-[var(--text)]">Conversations</span>
+                <span className="ml-2 font-mono text-[10px] text-[var(--text-muted)]">{contacts.length} contacts</span>
+              </div>
+              <div className="flex-1 overflow-y-auto">
                 {contacts.map(c => (
-                  <button
-                    key={c.id}
-                    onClick={() => setActiveId(c.id)}
-                    className={`w-full text-left px-3 py-3 border-b border-[var(--border)] hover:bg-[var(--bg-2)] transition-colors ${activeId === c.id ? 'bg-[var(--bg-2)]' : ''}`}
-                    style={activeId === c.id ? { borderLeft: `2px solid ${W.color}` } : {}}
-                  >
-                    <div className="flex items-center justify-between mb-0.5">
+                  <button key={c.id} onClick={() => setActiveId(c.id)}
+                    className={`w-full text-left px-3 py-2.5 border-b border-[var(--border)] transition-colors hover:bg-[var(--bg-2)] ${
+                      activeId === c.id ? 'bg-[var(--bg-2)]' : ''
+                    }`}>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${c.windowOpen ? 'bg-green-500' : 'bg-zinc-500'}`} />
                       <span className="text-xs font-semibold text-[var(--text)] truncate">{c.name}</span>
-                      <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                        {c.unread > 0 && (
-                          <span className="text-[9px] font-bold bg-green-500 text-white rounded-full w-4 h-4 flex items-center justify-center">{c.unread}</span>
-                        )}
-                        <span
-                          className={`w-1.5 h-1.5 rounded-full ${c.windowOpen ? 'bg-green-500' : 'bg-red-400'}`}
-                          title={c.windowOpen ? 'Window open' : 'Window closed'}
-                        />
-                      </div>
+                      {c.unread > 0 && (
+                        <span className="ml-auto shrink-0 text-[9px] font-mono bg-green-500 text-white rounded-full w-4 h-4 flex items-center justify-center">{c.unread}</span>
+                      )}
+                      <span className="ml-auto shrink-0 text-[10px] text-[var(--text-muted)]">{fmt(c.lastTs)}</span>
                     </div>
-                    <p className="text-[10px] font-mono text-[var(--text-muted)] truncate">{c.phone}</p>
-                    {c.preview && (
-                      <p className="text-[10px] text-[var(--text-muted)] truncate mt-0.5 opacity-70">{c.preview}</p>
-                    )}
-                    {c.lastTs && (
-                      <p className="text-[9px] text-[var(--text-muted)] mt-0.5 opacity-50">{fmt(c.lastTs)}</p>
-                    )}
+                    <p className="text-[10px] text-[var(--text-muted)] truncate pl-4">{c.preview}</p>
                   </button>
                 ))}
               </div>
+            </div>
 
-              {/* Conversation panel */}
-              <div className="flex-1 flex flex-col min-w-0">
-                {/* Header */}
-                <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--border)] shrink-0">
+            {/* Thread + composer */}
+            <div className="flex-1 flex flex-col min-w-0">
+              {/* Header */}
+              {activeContact && (
+                <div className="px-4 py-2.5 border-b border-[var(--border)] flex items-center gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-[var(--text)]">{activeContact?.name || '—'}</p>
-                    <p className="text-[10px] font-mono text-[var(--text-muted)]">{activeContact?.phone || ''}</p>
+                    <p className="text-sm font-semibold text-[var(--text)]">{activeContact.name}</p>
+                    <p className="text-[10px] font-mono text-[var(--text-muted)]">{activeContact.phone}</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${windowOpen ? 'border-green-500/30 text-green-500 bg-green-500/10' : 'border-red-400/30 text-red-400 bg-red-400/10'}`}>
-                      {windowOpen ? '✓ 24h window open' : '✗ window closed'}
-                    </span>
-                    <button
-                      onClick={simulateInbound}
-                      disabled={simulating || !live}
-                      title={live ? 'Simulate an inbound reply to reopen the 24h window' : 'Start the backend to use this'}
-                      className="text-[10px] font-mono px-2.5 py-1 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] disabled:opacity-40 flex items-center gap-1 transition-colors"
-                    >
-                      {simulating ? <RefreshCw size={10} className="animate-spin" /> : <RefreshCw size={10} />}
-                      Sim Inbound
-                    </button>
+                  <div className="flex items-center gap-1.5 ml-auto">
+                    <span className={`w-1.5 h-1.5 rounded-full ${windowOpen ? 'bg-green-500' : 'bg-zinc-500'}`} />
+                    <span className="text-[10px] text-[var(--text-muted)]">{windowOpen ? '24h window open' : 'window closed'}</span>
                   </div>
+                  <Button variant="ghost" size="sm" icon={RefreshCw} loading={simulating} onClick={simInbound}>Sim Inbound</Button>
                 </div>
+              )}
 
-                {/* Message thread */}
-                <div ref={threadRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
-                  {messages.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full text-center">
-                      <MessageSquare size={28} className="text-[var(--text-muted)] mb-2 opacity-30" />
-                      <p className="text-xs text-[var(--text-muted)] opacity-60">
-                        {live ? 'No messages in this conversation.' : 'Start the backend to load conversations.'}
-                      </p>
+              {/* Thread */}
+              <div ref={threadRef} className="flex-1 overflow-y-auto p-4 space-y-2">
+                {messages.map(m => (
+                  <div key={m.id} className={`flex ${m.dir === 'out' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[72%] px-3 py-2 rounded-xl text-xs ${
+                      m.dir === 'out'
+                        ? 'text-white rounded-br-sm'
+                        : 'bg-[var(--bg-2)] border border-[var(--border)] text-[var(--text)] rounded-bl-sm'
+                    }`} style={m.dir === 'out' ? { background: W.color } : {}}>
+                      {m.text}
+                      {m.type === 'template' && (
+                        <span className="block text-[8px] opacity-60 mt-0.5 font-mono uppercase tracking-widest">template</span>
+                      )}
                     </div>
-                  ) : (
-                    messages.map((m, i) => (
-                      <div key={m.id || i} className={`flex ${m.dir === 'out' ? 'justify-end' : 'justify-start'}`}>
-                        <div
-                          className={`max-w-[72%] rounded-2xl px-3 py-2 text-xs leading-relaxed ${
-                            m.dir === 'out'
-                              ? 'rounded-tr-sm text-white'
-                              : 'rounded-tl-sm bg-[var(--bg-2)] text-[var(--text)] border border-[var(--border)]'
-                          }`}
-                          style={m.dir === 'out' ? { background: W.color } : {}}
-                        >
-                          {m.type === 'template' && (
-                            <p className="text-[9px] font-mono uppercase tracking-widest mb-1 opacity-60">template</p>
-                          )}
-                          <span>{m.text}</span>
-                          <p className={`text-[9px] mt-1 text-right ${m.dir === 'out' ? 'opacity-60' : 'text-[var(--text-muted)]'}`}>
-                            {fmt(m.ts)}
-                          </p>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
+                  </div>
+                ))}
+                {messages.length === 0 && (
+                  <div className="flex items-center justify-center h-full text-xs text-[var(--text-muted)]">
+                    No messages yet — send one below
+                  </div>
+                )}
+              </div>
 
-                {/* Composer */}
-                <div className="border-t border-[var(--border)] px-4 py-3 shrink-0">
-                  {windowOpen ? (
+              {/* Composer */}
+              <div className="p-3 border-t border-[var(--border)]">
+                {windowOpen ? (
+                  <div className="flex gap-2">
+                    <textarea value={composerText} onChange={e => setComposerText(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (composerText.trim()) sendMessage() } }}
+                      placeholder="Type a message… (Enter to send)"
+                      rows={2}
+                      className="flex-1 bg-[var(--bg-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--text)] resize-none focus:outline-none focus:border-[var(--brand-500)]" />
+                    <Button icon={Send} loading={sending} onClick={sendMessage} disabled={!composerText.trim()}>Send</Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-xs text-amber-500">
+                      <Lock size={12} /><span>24h window closed — template required</span>
+                    </div>
                     <div className="flex gap-2">
-                      <textarea
-                        value={composerText}
-                        onChange={e => setComposerText(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (composerText.trim()) sendMsg() } }}
-                        placeholder={live ? 'Type a message… (Enter to send)' : 'Start the backend to send messages'}
-                        disabled={!live}
-                        rows={2}
-                        className="flex-1 resize-none bg-[var(--bg-2)] border border-[var(--border)] rounded-xl px-3 py-2 text-xs text-[var(--text)] focus:outline-none focus:border-brand-500 disabled:opacity-50"
-                      />
-                      <Button
-                        icon={Send}
-                        loading={sending}
-                        onClick={sendMsg}
-                        disabled={!composerText.trim() || !live}
-                      >Send</Button>
+                      <select value={selectedTpl} onChange={e => setSelectedTpl(e.target.value)}
+                        className="flex-1 bg-[var(--bg-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--text)] focus:outline-none">
+                        <option value="">Select template…</option>
+                        {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      </select>
+                      <Button icon={Send} loading={sending} onClick={sendMessage} disabled={!selectedTpl}>Send Template</Button>
                     </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-[10px] text-red-400 font-mono bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
-                        <Lock size={10} className="shrink-0" />
-                        <span>24-hour window closed — only approved templates can be sent. Hit <strong>Sim Inbound</strong> to reopen it.</span>
-                      </div>
-                      <div className="flex gap-2">
-                        <div className="relative flex-1">
-                          <select
-                            value={selectedTemplate}
-                            onChange={e => setSelectedTemplate(e.target.value)}
-                            disabled={!live}
-                            className="w-full appearance-none bg-[var(--bg-2)] border border-[var(--border)] rounded-xl px-3 py-2 text-xs font-mono text-[var(--text)] focus:outline-none focus:border-brand-500 pr-8 disabled:opacity-50"
-                          >
-                            <option value="">Select template…</option>
-                            {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                          </select>
-                          <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none" />
-                        </div>
-                        <Button
-                          icon={Send}
-                          loading={sending}
-                          onClick={sendMsg}
-                          disabled={!selectedTemplate || !live}
-                          variant="outline"
-                        >Send Template</Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
         )}
 
-        {/* ── WORKFLOWS TAB ── */}
-        {tab === 'Workflows' && (
-          <div className="space-y-3">
-            <p className="text-xs text-[var(--text-muted)]">
-              Toggle workflows active/paused — changes hit <span className="font-mono text-[var(--text)]">PATCH {W.apiBase}/workflows/:id</span>.
-            </p>
-            {workflows.map(w => (
-              <div key={w.id} className="card p-4 flex items-center gap-4">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-[var(--text)]">{w.name}</p>
-                  <p className="text-[10px] font-mono text-[var(--text-muted)] mt-1">
-                    <span className="text-[var(--text)]">trigger:</span> {w.trigger}
-                    &nbsp;<span className="opacity-40">→</span>&nbsp;
-                    <span className="text-[var(--text)]">action:</span> {w.action}
-                  </p>
-                </div>
-                <span className="font-mono text-[10px] text-[var(--text-muted)] whitespace-nowrap shrink-0">
-                  {w.runs.toLocaleString()} runs
-                </span>
-                <button
-                  onClick={() => toggleWorkflow(w.id)}
-                  className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[10px] font-mono font-bold uppercase tracking-widest transition-colors ${
-                    w.active
-                      ? 'border-green-500/30 text-green-500 bg-green-500/10 hover:bg-green-500/20'
-                      : 'border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--bg-2)]'
-                  }`}
-                >
-                  {w.active ? <><Pause size={10} /> Active</> : <><Play size={10} /> Paused</>}
-                </button>
+        {/* ── Tab: Contacts ── */}
+        {activeTab === 'contacts' && (
+          <section className="space-y-4">
+            <div className="flex gap-3 flex-wrap">
+              <div className="flex-1 min-w-[200px] relative">
+                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+                <input value={contactSearch} onChange={e => setContactSearch(e.target.value)}
+                  placeholder="Search name or phone…"
+                  className="w-full pl-8 pr-3 py-2 bg-[var(--bg-2)] border border-[var(--border)] rounded-lg text-sm text-[var(--text)] focus:outline-none" />
               </div>
-            ))}
-          </div>
+              <div className="flex rounded-lg border border-[var(--border)] overflow-hidden">
+                {['all','open','closed'].map(f => (
+                  <button key={f} onClick={() => setWindowFilter(f)}
+                    className={`px-3 py-2 text-xs font-mono capitalize transition-colors ${
+                      windowFilter === f ? 'text-white' : 'text-[var(--text-muted)] bg-[var(--bg-2)] hover:text-[var(--text)]'
+                    }`}
+                    style={windowFilter === f ? { background: W.color } : {}}>
+                    {f}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="card divide-y divide-[var(--border)]">
+              {filteredContacts.length === 0 && (
+                <p className="py-6 text-center text-sm text-[var(--text-muted)]">No contacts match your filter.</p>
+              )}
+              {filteredContacts.map(c => (
+                <div key={c.id} className="flex items-center gap-4 px-4 py-3">
+                  <div className={`w-2 h-2 rounded-full shrink-0 ${c.windowOpen ? 'bg-green-500' : 'bg-zinc-500'}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-[var(--text)]">{c.name}</p>
+                    <p className="text-[10px] font-mono text-[var(--text-muted)]">{c.phone}</p>
+                  </div>
+                  <div className="flex gap-1 flex-wrap">
+                    {(c.tags || []).map(tag => (
+                      <span key={tag} className="text-[9px] font-mono px-1.5 py-0.5 rounded border border-[var(--border)] text-[var(--text-muted)]">{tag}</span>
+                    ))}
+                  </div>
+                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded ${c.windowOpen ? 'text-green-400 bg-green-500/10' : 'text-zinc-400 bg-zinc-500/10'}`}>
+                    {c.windowOpen ? 'window open' : 'window closed'}
+                  </span>
+                  <button onClick={() => { setActiveId(c.id); setActiveTab('inbox') }}
+                    className="text-[10px] font-mono px-2 py-1 rounded border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] transition-colors">
+                    Open chat
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
         )}
 
+        {/* ── Tab: Campaigns ── */}
+        {activeTab === 'campaigns' && (
+          <section className="space-y-6">
+            {/* Create form */}
+            <div className="card p-5">
+              <h3 className="text-sm font-bold text-[var(--text)] mb-4 flex items-center gap-2">
+                <Plus size={14} style={{ color: W.color }} />New Campaign
+              </h3>
+              <div className="flex flex-wrap gap-3 items-end">
+                <label className="flex-1 min-w-[160px]">
+                  <span className="block text-[10px] font-mono uppercase tracking-widest text-[var(--text-muted)] mb-1">Name</span>
+                  <input value={campForm.name} onChange={e => setCampForm(f => ({ ...f, name: e.target.value }))}
+                    placeholder="Campaign name…"
+                    className="w-full bg-[var(--bg-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] focus:outline-none" />
+                </label>
+                <label className="min-w-[160px]">
+                  <span className="block text-[10px] font-mono uppercase tracking-widest text-[var(--text-muted)] mb-1">Template</span>
+                  <select value={campForm.templateId} onChange={e => setCampForm(f => ({ ...f, templateId: e.target.value }))}
+                    className="w-full bg-[var(--bg-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] focus:outline-none">
+                    {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </label>
+                <label className="min-w-[140px]">
+                  <span className="block text-[10px] font-mono uppercase tracking-widest text-[var(--text-muted)] mb-1">Audience</span>
+                  <select value={campForm.audience} onChange={e => setCampForm(f => ({ ...f, audience: e.target.value }))}
+                    className="w-full bg-[var(--bg-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] focus:outline-none">
+                    <option value="all">All contacts</option>
+                    <option value="window_open">Window open</option>
+                    <option value="window_closed">Window closed</option>
+                  </select>
+                </label>
+                <Button icon={Plus} loading={creating} onClick={createCampaign} style={{ background: W.color, color: '#fff', border: 'none' }}>
+                  Create
+                </Button>
+              </div>
+            </div>
+
+            {/* Campaign list */}
+            <div className="space-y-3">
+              {campaigns.map(c => {
+                const tpl = templates.find(t => t.id === c.templateId)
+                return (
+                  <div key={c.id} className="card p-4 flex items-center gap-4">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-[var(--text)]">{c.name}</p>
+                      <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
+                        {tpl?.name || c.templateId} · {audienceLabel[c.audience]}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs">
+                      {c.status === 'sent' ? (
+                        <>
+                          <span className="font-mono text-[var(--text-muted)]">{c.sentCount} sent</span>
+                          <span className="font-mono" style={{ color: W.color }}>{c.openRate}% open</span>
+                          <span className="flex items-center gap-1 text-green-500"><CheckCircle size={12} />sent</span>
+                        </>
+                      ) : (
+                        <span className="flex items-center gap-1 text-[var(--text-muted)]"><Circle size={12} />draft</span>
+                      )}
+                    </div>
+                    {c.status === 'draft' && (
+                      <Button size="sm" icon={Send} loading={sending2 === c.id} onClick={() => sendCampaign(c.id)}
+                        style={{ background: W.color, color: '#fff', border: 'none', fontSize: '12px', padding: '4px 12px' }}>
+                        Send
+                      </Button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* ── Tab: Templates ── */}
+        {activeTab === 'templates' && (
+          <section>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {templates.map(t => (
+                <div key={t.id} className="card p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <FileText size={14} style={{ color: W.color }} />
+                    <span className="text-sm font-semibold text-[var(--text)]">{t.name}</span>
+                    {t.category && (
+                      <span className="ml-auto text-[9px] font-mono px-1.5 py-0.5 rounded border border-[var(--border)] text-[var(--text-muted)]">
+                        {t.category}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-[var(--text-muted)] bg-[var(--bg-2)] rounded-lg p-3 leading-relaxed font-mono">
+                    {t.body}
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] text-[var(--text-muted)]">
+                    <span className="font-mono text-[9px] px-1.5 py-0.5 bg-[var(--bg-2)] border border-[var(--border)] rounded">{t.id}</span>
+                    <span>· pre-approved · usable outside 24h window</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ── Tab: Analytics ── */}
+        {activeTab === 'analytics' && (
+          <section className="space-y-6">
+            {!analytics ? (
+              <div className="card p-8 text-center text-sm text-[var(--text-muted)]">
+                Loading analytics — connect the backend API to see live data.
+              </div>
+            ) : (
+              <>
+                {/* KPI grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <StatCard label="Total Contacts"    value={analytics.totalContacts}           color={W.color} />
+                  <StatCard label="Window Open Rate"  value={`${analytics.windowOpenRate}%`}    color="#22c55e" />
+                  <StatCard label="Total Messages"    value={analytics.totalMessages}            color={W.color} />
+                  <StatCard label="Response Rate"     value={`${analytics.responseRate}%`}       color="#22c55e" />
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                  {/* Message breakdown */}
+                  <div className="card p-4">
+                    <h3 className="text-sm font-bold text-[var(--text)] mb-3">Message Breakdown</h3>
+                    <div className="space-y-2">
+                      <Bar label="Inbound"   value={analytics.inbound}       total={analytics.totalMessages} color="#22c55e" />
+                      <Bar label="Outbound"  value={analytics.outbound}      total={analytics.totalMessages} color={W.color} />
+                      <Bar label="Templates" value={analytics.templatesSent} total={analytics.totalMessages} color="#8b5cf6" />
+                    </div>
+                  </div>
+
+                  {/* Window status */}
+                  <div className="card p-4">
+                    <h3 className="text-sm font-bold text-[var(--text)] mb-3">Window Status</h3>
+                    <div className="space-y-3">
+                      <Bar label="Open"   value={analytics.contactsByWindow.open}   total={analytics.totalContacts} color="#22c55e" />
+                      <Bar label="Closed" value={analytics.contactsByWindow.closed} total={analytics.totalContacts} color="#64748b" />
+                    </div>
+                    <div className="mt-4 p-3 rounded-lg bg-[var(--bg-2)] border border-[var(--border)]">
+                      <p className="text-xs text-[var(--text-muted)]">
+                        Active workflows: <span className="font-bold text-[var(--text)]">{analytics.activeWorkflows}</span>
+                        {' · '}Total workflow runs: <span className="font-bold" style={{ color: W.color }}>{analytics.totalWorkflowRuns.toLocaleString()}</span>
+                      </p>
+                      {analytics.topWorkflow && (
+                        <p className="text-xs text-[var(--text-muted)] mt-1">
+                          Top workflow: <span className="font-bold text-[var(--text)]">{analytics.topWorkflow.name}</span>
+                          {' '}({analytics.topWorkflow.runs.toLocaleString()} runs)
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Workflow table */}
+                <div className="card divide-y divide-[var(--border)]">
+                  <div className="px-4 py-2 flex items-center">
+                    <span className="text-xs font-bold text-[var(--text)]">Workflow Performance</span>
+                  </div>
+                  {workflows.map(w => (
+                    <div key={w.id} className="flex items-center gap-4 px-4 py-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-[var(--text)]">{w.name}</p>
+                        <p className="text-[10px] text-[var(--text-muted)]">{w.trigger} → {w.action}</p>
+                      </div>
+                      <span className="font-mono text-sm font-bold" style={{ color: W.color }}>{w.runs.toLocaleString()}</span>
+                      <span className="text-[10px] font-mono text-[var(--text-muted)]">runs</span>
+                      <button onClick={() => toggleWorkflow(w.id)}
+                        className={`flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-lg border transition-colors ${
+                          w.active ? 'border-green-500/30 text-green-500 bg-green-500/10' : 'border-[var(--border)] text-[var(--text-muted)] bg-[var(--bg-2)]'
+                        }`}>
+                        {w.active ? <Play size={10} /> : <Pause size={10} />}
+                        {w.active ? 'active' : 'paused'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </section>
+        )}
       </div>
     </DashboardLayout>
+  )
+}
+
+function StatCard({ label, value, color }) {
+  return (
+    <div className="card p-4 text-center">
+      <div className="text-2xl font-mono font-bold" style={{ color }}>{value}</div>
+      <div className="text-[11px] text-[var(--text-muted)] mt-1">{label}</div>
+    </div>
+  )
+}
+
+function Bar({ label, value, total, color }) {
+  const pct = total > 0 ? Math.round(value / total * 100) : 0
+  return (
+    <div>
+      <div className="flex justify-between text-[10px] mb-1">
+        <span className="text-[var(--text-muted)]">{label}</span>
+        <span className="font-mono" style={{ color }}>{value} ({pct}%)</span>
+      </div>
+      <div className="h-1.5 bg-[var(--bg-2)] rounded-full overflow-hidden border border-[var(--border)]">
+        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
+      </div>
+    </div>
   )
 }

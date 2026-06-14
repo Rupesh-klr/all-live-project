@@ -29,7 +29,15 @@ export const WHATSAPP = {
     templates:      `${apiBase}/templates`,
     workflows:      `${apiBase}/workflows`,
     toggleWorkflow: (id) => `${apiBase}/workflows/${id}`,
+    analytics:      `${apiBase}/analytics`,
+    campaigns:      `${apiBase}/campaigns`,
+    sendCampaign:   (id) => `${apiBase}/campaigns/${id}/send`,
   },
+  demoCampaigns: [
+    { id: 'camp1', name: 'Black Friday Re-engagement', templateId: 't_offer',    audience: 'window_closed', status: 'sent',  sentCount: 3, openRate: 67 },
+    { id: 'camp2', name: 'Invoice Dispatch Batch',      templateId: 't_invoice',  audience: 'all',           status: 'sent',  sentCount: 5, openRate: 80 },
+    { id: 'camp3', name: 'Customer Satisfaction Poll',  templateId: 't_reengage', audience: 'window_open',   status: 'draft', sentCount: 0, openRate:  0 },
+  ],
   demoContacts: [
     { id: 'C1', name: 'Priya Sharma', phone: '+91 98765 43210', windowOpen: true,  unread: 2, preview: 'Thanks, also need the invoice.',                  lastTs: Date.now() - 5 * 60 * 1000 },
     { id: 'C2', name: 'Rajan Mehta',  phone: '+91 87654 32109', windowOpen: true,  unread: 0, preview: 'You: Yes, in stock. Want me to reserve one?',      lastTs: Date.now() - 3 * 60 * 60 * 1000 },

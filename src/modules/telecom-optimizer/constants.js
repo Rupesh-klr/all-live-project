@@ -79,6 +79,39 @@ export const TOPOLOGY_NODES = {
 }
 
 /**
+ * Edges for each topology — parallel to TOPOLOGY_NODES, used for SVG map rendering.
+ * Format: [sourceId, targetId] pairs (weights omitted — not needed for drawing).
+ */
+export const TOPOLOGY_EDGES = {
+  'backbone': [
+    ['N1','N2'],['N1','N4'],['N2','N3'],['N2','N5'],['N3','N6'],
+    ['N4','N5'],['N4','N8'],['N5','N6'],['N5','N9'],['N6','N7'],
+    ['N7','N10'],['N8','N9'],['N8','N11'],['N9','N10'],['N9','N12'],['N10','N12'],
+  ],
+  'metro-ring': [
+    ['MR1','MR2'],['MR2','MR3'],['MR3','MR4'],['MR4','MR5'],
+    ['MR5','MR6'],['MR6','MR7'],['MR7','MR8'],['MR8','MR1'],
+    ['MR1','MR5'],['MR3','MR7'],['MR2','MR6'],
+  ],
+  'hub-spoke': [
+    ['H1','SP1'],['H1','SP2'],['H1','SP3'],['H1','SP4'],
+    ['SP1','E1'],['SP1','E4'],['SP2','E1'],['SP2','E2'],
+    ['SP3','E2'],['SP3','E3'],['SP4','E3'],['SP4','E4'],
+    ['E1','E2'],['E3','E4'],
+  ],
+  'linear-chain': [
+    ['LC1','LC2'],['LC2','LC3'],['LC3','LC4'],['LC4','LC5'],
+    ['LC2','LC6'],['LC6','LC7'],['LC7','LC8'],['LC8','LC4'],
+  ],
+  'cdn-mesh': [
+    ['G1','G4'],['G1','G2'],['G2','G8'],['G2','G3'],['G3','G4'],
+    ['G4','G5'],['G4','G6'],['G5','G6'],['G5','G9'],
+    ['G6','G7'],['G6','G9'],['G7','G8'],['G7','G9'],
+    ['G8','G9'],['G8','G10'],['G9','G10'],
+  ],
+}
+
+/**
  * Telecom Optimizer — all module-owned data lives here.
  * Consumed by index.jsx (public page), Dashboard.jsx (interactive demo),
  * and module.config.jsx (registration/nav). One source of truth per module.
@@ -108,6 +141,8 @@ export const TELECOM = {
     demoNodes:    `${apiBase}/demo/nodes`,
     nodes:        `${apiBase}/nodes`,
     shortestPath: `${apiBase}/graph/shortest-path`,
+    benchmark:    `${apiBase}/graph/benchmark`,
+    history:      `${apiBase}/graph/history`,
   },
   algorithms: [
     { id: 'dijkstra', label: 'Dijkstra', detail: 'Classic shortest path' },
