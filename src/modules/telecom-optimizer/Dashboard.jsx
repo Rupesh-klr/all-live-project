@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   ExternalLink, Play, ArrowRight, Cpu, Clock, Route as RouteIcon,
-  Server, Activity, Zap,
+  Server, Activity, Zap, Network,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { DashboardLayout } from '../common/DashboardLayout'
@@ -11,10 +11,9 @@ import { Button } from '../../components/Button/Button'
 import { Pagination } from '../../components/Pagination/Pagination'
 import { usePagination } from '../../hooks/usePagination'
 import api from '../../utils/api'
-import { TELECOM } from './constants'
+import { TELECOM, TOPOLOGY_OPTIONS, TOPOLOGY_NODES } from './constants'
 
 const PAGE_SIZE = 5
-const NODE_OPTIONS = TELECOM.demoNodes.map(n => ({ id: n.id, name: n.name }))
 
 // ── Node health table columns ──────────────────────────────────────────────────
 const COLS = [
@@ -27,10 +26,10 @@ const COLS = [
   )},
 ]
 
-// ── Styled node selector ────────────────────────────────────────────────────────
-function NodeSelect({ label, value, onChange }) {
+// ── Styled node selector — shows nodes from the active topology ────────────────
+function NodeSelect({ label, value, onChange, nodes }) {
   return (
-    <label className="flex-1 min-w-[120px]">
+    <label className="flex-1 min-w-[140px]">
       <span className="block text-[10px] font-mono uppercase tracking-widest text-[var(--text-muted)] mb-1.5">{label}</span>
       <select
         value={value}
@@ -38,47 +37,61 @@ function NodeSelect({ label, value, onChange }) {
         className="w-full bg-[var(--bg-2)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm
                    font-mono text-[var(--text)] focus:outline-none focus:border-brand-500"
       >
-        {NODE_OPTIONS.map(n => <option key={n.id} value={n.id}>{n.id} — {n.name}</option>)}
+        {nodes.map(n => <option key={n.id} value={n.id}>{n.id} — {n.name}</option>)}
       </select>
     </label>
   )
 }
 
 export function TelecomDashboard() {
-  // ── Node table (server-paginated, falls back to local demo data) ──────────────
-  const [serverMode, setServerMode]   = useState(true)
-  const [nodes, setNodes]             = useState([])
-  const [pageMeta, setPageMeta]       = useState({ page: 1, totalPages: 1, total: 0, limit: PAGE_SIZE })
-  const [nodesLoading, setNodesLoading] = useState(true)
-  const clientPager = usePagination(TELECOM.demoNodes, PAGE_SIZE)
+  // ── Topology selection ──────────────────────────────────────────────────────
+  const [topologyId, setTopologyId] = useState('backbone')
+  const activeTopo = TOPOLOGY_OPTIONS.find(t => t.id === topologyId) || TOPOLOGY_OPTIONS[0]
+  const fallbackNodes = TOPOLOGY_NODES[topologyId] || TOPOLOGY_NODES['backbone']
 
-  async function loadNodes(page = 1) {
+  // ── Node table (server-paginated, falls back to local template data) ──────────
+  const [serverMode, setServerMode]     = useState(true)
+  const [nodes, setNodes]               = useState([])
+  const [pageMeta, setPageMeta]         = useState({ page: 1, totalPages: 1, total: 0, limit: PAGE_SIZE })
+  const [nodesLoading, setNodesLoading] = useState(true)
+  const clientPager = usePagination(fallbackNodes, PAGE_SIZE)
+
+  const loadNodes = useCallback(async (page = 1, topoId = topologyId) => {
     setNodesLoading(true)
     try {
-      const { data } = await api.get(`${TELECOM.endpoints.nodes}?page=${page}&limit=${PAGE_SIZE}`)
+      const { data } = await api.get(`${TELECOM.endpoints.nodes}?page=${page}&limit=${PAGE_SIZE}&topology=${topoId}`)
       setNodes(data.data)
       setPageMeta(data.pagination)
       setServerMode(true)
     } catch {
-      setServerMode(false) // API offline — use bundled demo data so the UI still shows
+      setServerMode(false)
     } finally {
       setNodesLoading(false)
     }
-  }
-  useEffect(() => { loadNodes(1) }, [])
+  }, [topologyId])
+
+  useEffect(() => { loadNodes(1, topologyId) }, [topologyId])
 
   // ── Shortest-path runner ──────────────────────────────────────────────────────
-  const [source, setSource]       = useState('N1')
-  const [target, setTarget]       = useState('N12')
+  const [source, setSource]       = useState(activeTopo.defaultSource)
+  const [target, setTarget]       = useState(activeTopo.defaultTarget)
   const [algorithm, setAlgorithm] = useState('dijkstra')
   const [running, setRunning]     = useState(false)
   const [result, setResult]       = useState(null)
+
+  function changeTopology(t) {
+    setTopologyId(t.id)
+    setSource(t.defaultSource)
+    setTarget(t.defaultTarget)
+    setResult(null)
+    clientPager.setPage(1)
+  }
 
   async function runShortestPath() {
     setRunning(true)
     const t0 = performance.now()
     try {
-      const { data } = await api.post(TELECOM.endpoints.shortestPath, { source, target, algorithm })
+      const { data } = await api.post(TELECOM.endpoints.shortestPath, { source, target, algorithm, topologyId })
       setResult({ ...data.data, clientMs: Math.round(performance.now() - t0) })
     } catch (err) {
       setResult(null)
@@ -88,13 +101,14 @@ export function TelecomDashboard() {
     }
   }
 
+  const nodeOptions = serverMode ? nodes : fallbackNodes
   const rows = serverMode ? nodes : clientPager.pageItems
 
   return (
     <DashboardLayout
       slug={TELECOM.slug}
       title={TELECOM.name}
-      subtitle="Graph-Theory routing engine — run real Dijkstra / A* path computation against the live API."
+      subtitle="Real Dijkstra / A* running in Node.js — pick a topology template, choose two nodes, run the path."
       actions={
         <a href={TELECOM.liveDemoUrl} target={TELECOM.liveDemoUrl.startsWith('http') ? '_blank' : undefined} rel="noreferrer">
           <Button variant="outline" icon={ExternalLink} iconPos="right">Live Demo</Button>
@@ -109,10 +123,10 @@ export function TelecomDashboard() {
             <Activity size={18} style={{ color: TELECOM.color }} />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-[var(--text)]">This dashboard is the live working demo</p>
+            <p className="text-sm font-semibold text-[var(--text)]">5 topology templates — all computed in Node.js, no Python needed</p>
             <p className="text-xs text-[var(--text-muted)] mt-0.5">
-              Every action below hits the real backend at
-              <span className="font-mono text-[var(--text)]"> {TELECOM.apiBase}</span>. No mock data when the API is up.
+              Hits the real backend at
+              <span className="font-mono text-[var(--text)]"> {TELECOM.apiBase}</span>. Falls back to bundled template data when offline.
             </p>
           </div>
           <div className="hidden sm:flex items-center gap-1.5">
@@ -163,14 +177,39 @@ export function TelecomDashboard() {
             <h2 className="text-sm font-bold text-[var(--text)]">Shortest-Path Runner</h2>
           </div>
           <p className="text-xs text-[var(--text-muted)] mb-4">
-            Pick two nodes and an algorithm — the API computes the optimal route by total latency.
+            Select a topology template, pick two nodes and an algorithm — the API computes the optimal route by total latency.
           </p>
+
+          {/* Topology selector */}
+          <div className="mb-5">
+            <span className="block text-[10px] font-mono uppercase tracking-widest text-[var(--text-muted)] mb-2">
+              <Network size={10} className="inline mr-1" />Network Topology
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {TOPOLOGY_OPTIONS.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => changeTopology(t)}
+                  title={t.desc}
+                  className={`px-3 py-1.5 rounded-lg border text-xs font-mono transition-colors ${
+                    topologyId === t.id
+                      ? 'text-white border-transparent'
+                      : 'border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] bg-[var(--bg-2)]'
+                  }`}
+                  style={topologyId === t.id ? { background: TELECOM.color } : {}}
+                >
+                  {t.name}
+                  <span className={`ml-1.5 text-[9px] ${topologyId === t.id ? 'opacity-70' : 'opacity-40'}`}>{t.desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* Controls */}
           <div className="flex flex-wrap items-end gap-3 mb-4">
-            <NodeSelect label="Source" value={source} onChange={setSource} />
+            <NodeSelect label="Source" value={source} onChange={setSource} nodes={nodeOptions.length ? nodeOptions : fallbackNodes} />
             <ArrowRight size={16} className="text-[var(--text-muted)] mb-2.5 hidden sm:block" />
-            <NodeSelect label="Target" value={target} onChange={setTarget} />
+            <NodeSelect label="Target" value={target} onChange={setTarget} nodes={nodeOptions.length ? nodeOptions : fallbackNodes} />
             <div>
               <span className="block text-[10px] font-mono uppercase tracking-widest text-[var(--text-muted)] mb-1.5">Algorithm</span>
               <div className="flex rounded-lg border border-[var(--border)] overflow-hidden">
@@ -194,8 +233,9 @@ export function TelecomDashboard() {
 
           {/* Request line (API-console feel) */}
           <div className="rounded-lg bg-[var(--bg-2)] border border-[var(--border)] px-3 py-2 font-mono text-[11px] text-[var(--text-muted)] overflow-x-auto">
-            <span className="text-green-500 font-bold">POST</span> {TELECOM.endpoints.shortestPath}
-            <span className="text-[var(--text-muted)]"> &nbsp;{JSON.stringify({ source, target, algorithm })}</span>
+            <span className="text-green-500 font-bold">POST</span>{' '}
+            {TELECOM.endpoints.shortestPath}
+            <span className="text-[var(--text-muted)]">{' '}{JSON.stringify({ source, target, algorithm, topologyId })}</span>
           </div>
 
           {/* Result */}
@@ -205,7 +245,8 @@ export function TelecomDashboard() {
               <div className="flex flex-wrap items-center gap-1.5">
                 {result.path.map((id, i) => (
                   <span key={`${id}-${i}`} className="flex items-center gap-1.5">
-                    <span className="font-mono text-xs px-2 py-1 rounded-lg border" style={{ borderColor: `${TELECOM.color}40`, color: TELECOM.color, background: `${TELECOM.color}10` }}>
+                    <span className="font-mono text-xs px-2 py-1 rounded-lg border"
+                          style={{ borderColor: `${TELECOM.color}40`, color: TELECOM.color, background: `${TELECOM.color}10` }}>
                       {id}
                     </span>
                     {i < result.path.length - 1 && <ArrowRight size={12} className="text-[var(--text-muted)]" />}
@@ -215,10 +256,10 @@ export function TelecomDashboard() {
 
               {/* Metrics */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <Metric icon={Clock}    label="Total latency"  value={`${result.totalLatency}ms`} />
-                <Metric icon={RouteIcon} label="Hops"          value={result.hops} />
-                <Metric icon={Cpu}      label="Nodes explored" value={result.nodesExplored} />
-                <Metric icon={Server}   label="Round-trip"     value={`${result.clientMs}ms`} />
+                <Metric icon={Clock}     label="Total latency"  value={`${result.totalLatency}ms`} />
+                <Metric icon={RouteIcon} label="Hops"           value={result.hops} />
+                <Metric icon={Cpu}       label="Nodes explored" value={result.nodesExplored} />
+                <Metric icon={Server}    label="Round-trip"     value={`${result.clientMs}ms`} />
               </div>
 
               {/* Segments */}
@@ -242,9 +283,10 @@ export function TelecomDashboard() {
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-bold text-[var(--text)] flex items-center gap-2">
               <Server size={15} style={{ color: TELECOM.color }} /> Network Node Health
+              <span className="font-mono text-[10px] text-[var(--text-muted)] font-normal">({activeTopo.name})</span>
             </h2>
             {!serverMode && (
-              <span className="font-mono text-[10px] text-amber-500">offline demo data — start the API to go live</span>
+              <span className="font-mono text-[10px] text-amber-500">offline — showing bundled template data</span>
             )}
           </div>
           <Table columns={COLS} rows={rows} loading={nodesLoading} emptyMessage="No nodes found." />
@@ -252,7 +294,7 @@ export function TelecomDashboard() {
             <Pagination
               page={pageMeta.page} totalPages={pageMeta.totalPages}
               total={pageMeta.total} pageSize={pageMeta.limit}
-              onPage={loadNodes} loading={nodesLoading}
+              onPage={(p) => loadNodes(p, topologyId)} loading={nodesLoading}
             />
           ) : (
             <Pagination
