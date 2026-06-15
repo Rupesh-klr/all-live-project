@@ -101,6 +101,9 @@ export function Dashboard() {
             </span>
           </div>
           <div className="flex items-center gap-3">
+            <a href="/about" className="hidden sm:inline font-mono text-xs text-[var(--text-muted)] hover:text-brand-500 transition-colors">
+              About
+            </a>
             <div className="hidden sm:flex items-center gap-2 text-xs text-[var(--text-muted)]">
               <span className="font-mono">{user?.username}</span>
               <Badge role={user?.role} />
@@ -243,6 +246,7 @@ export function Dashboard() {
         {/* ── Footer ────────────────────────────────────────────────────────── */}
         <footer className="mt-14 pt-6 border-t border-[var(--border)] flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-4 text-xs text-[var(--text-muted)] font-mono">
+            <a href="/about"   className="hover:text-brand-500 transition-colors">About</a>
             <a href="/guide"   className="hover:text-brand-500 transition-colors">Guide</a>
             <a href="/privacy" className="hover:text-brand-500 transition-colors">Privacy</a>
             <a href="/terms"   className="hover:text-brand-500 transition-colors">Terms</a>

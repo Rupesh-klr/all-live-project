@@ -11,6 +11,7 @@ import { Guide }          from './pages/Guide'
 import { PrivacyPolicy }  from './pages/PrivacyPolicy'
 import { Terms }          from './pages/Terms'
 import { Dashboard }      from './pages/Dashboard'
+import { About }          from './pages/About'
 import { OnboardingModal }    from './modules/common/OnboardingModal'
 import { SessionExpiredModal } from './modules/common/SessionExpiredModal'
 import { ScrollRestorer }      from './modules/common/ScrollRestorer'
@@ -45,6 +46,7 @@ export default function App() {
             <Route path="/signup" element={<Signup />} />
 
             {/* ── Public static pages ──────────────────────────── */}
+            <Route path="/about"   element={<About />} />
             <Route path="/guide"   element={<Guide />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms"   element={<Terms />} />

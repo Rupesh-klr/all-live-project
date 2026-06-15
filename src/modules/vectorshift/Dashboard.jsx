@@ -46,6 +46,7 @@ export function VectorShiftDashboard() {
   const [query,       setQuery]       = useState('')
   const [running,     setRunning]     = useState(false)
   const [result,      setResult]      = useState(null)
+  const [useMmr,      setUseMmr]      = useState(false)
 
   // ── Knowledge ─────────────────────────────────────────────────────────────
   const [chunks,      setChunks]      = useState([])
@@ -112,7 +113,7 @@ export function VectorShiftDashboard() {
     if (!query.trim() || !selected) return
     setRunning(true); setResult(null)
     try {
-      const { data } = await api.post(V.endpoints.run(selected.id), { query })
+      const { data } = await api.post(V.endpoints.run(selected.id), { query, mmr: useMmr, lambda: 0.6 })
       setResult(data.data)
       setPipelines(ps => ps.map(p => p.id === selected.id ? { ...p, queries: (p.queries || 0) + 1 } : p))
     } catch (err) { toast.error(err.response?.data?.message || 'Query failed') }
@@ -299,6 +300,19 @@ export function VectorShiftDashboard() {
                 </Button>
               </div>
 
+              {/* Retrieval strategy toggle */}
+              <button
+                onClick={() => setUseMmr(v => !v)}
+                className="flex items-center gap-2 text-[11px] font-mono text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
+                title="Maximal Marginal Relevance — diversifies retrieved chunks to cut redundancy"
+              >
+                <span className={`relative w-7 h-4 rounded-full transition-colors ${useMmr ? '' : 'bg-[var(--bg-2)] border border-[var(--border)]'}`} style={useMmr ? { background: V.color } : {}}>
+                  <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${useMmr ? 'left-3.5' : 'left-0.5'}`} />
+                </span>
+                MMR re-ranking {useMmr ? 'on' : 'off'}
+                <span className="text-[var(--text-muted)]">· diversifies sources (λ=0.6)</span>
+              </button>
+
               {selected && (
                 <div className="text-[10px] font-mono text-[var(--text-muted)]">
                   <span className="text-green-500 font-bold">POST</span>{' '}{V.endpoints.run(selected.id)}{' '}
@@ -312,8 +326,15 @@ export function VectorShiftDashboard() {
                     <div className="flex items-center gap-2 mb-2">
                       <Sparkles size={14} style={{ color: V.color }} />
                       <span className="text-xs font-bold text-[var(--text)]">Answer</span>
-                      <span className={`ml-auto text-[9px] font-mono px-1.5 py-0.5 rounded ${result.grounded ? 'text-green-500 bg-green-500/10' : 'text-amber-500 bg-amber-500/10'}`}>
-                        {result.grounded ? 'grounded' : 'low confidence'}
+                      <span className="ml-auto flex items-center gap-1.5">
+                        {result.retrieval && (
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded border border-[var(--border)] text-[var(--text-muted)]">
+                            {result.retrieval}
+                          </span>
+                        )}
+                        <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${result.grounded ? 'text-green-500 bg-green-500/10' : 'text-amber-500 bg-amber-500/10'}`}>
+                          {result.grounded ? 'grounded' : 'low confidence'}
+                        </span>
                       </span>
                     </div>
                     <p className="text-sm text-[var(--text)] leading-relaxed">{result.answer}</p>

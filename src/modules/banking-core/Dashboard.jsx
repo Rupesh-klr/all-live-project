@@ -257,7 +257,13 @@ export function BankingDashboard() {
 
                 <div className="rounded-lg bg-[var(--bg-2)] border border-[var(--border)] p-3 font-mono text-[11px] space-y-1">
                   <div className="flex justify-between"><span className="text-[var(--text-muted)]">TX ID</span><span className="text-amber-400">{activeTx.id}</span></div>
-                  <div className="flex justify-between"><span className="text-[var(--text-muted)]">Amount</span><span>{money(activeTx.amount)} {activeTx.currency}</span></div>
+                  <div className="flex justify-between"><span className="text-[var(--text-muted)]">Debit</span><span>{money(activeTx.amount)} {activeTx.currency}</span></div>
+                  {activeTx.crossCurrency && (
+                    <>
+                      <div className="flex justify-between"><span className="text-[var(--text-muted)]">FX rate</span><span style={{ color: B.color }}>1 {activeTx.currency} = {activeTx.fxRate} {activeTx.toCurrency}</span></div>
+                      <div className="flex justify-between"><span className="text-[var(--text-muted)]">Credit</span><span>{money(activeTx.creditAmount)} {activeTx.toCurrency}</span></div>
+                    </>
+                  )}
                   <div className="flex justify-between"><span className="text-[var(--text-muted)]">Status</span><span className={statusColor[activeTx.status]}>{activeTx.status}</span></div>
                 </div>
               </div>

@@ -1,5 +1,7 @@
 # Module: whatsapp-crm (Frontend)
 
+> **🔗 Live demo:** https://all-live-project-rupesh-klr.holistichealervedika.com/whatsapp-crm
+
 > React · Axios · Table component · Modal component · Badge component
 
 Automated WhatsApp CRM Engine dashboard — contact list with conversation preview, outbound message compose, and workflow management. Designed for CRM agents who need high-volume WhatsApp conversation management.

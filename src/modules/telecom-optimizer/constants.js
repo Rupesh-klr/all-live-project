@@ -142,6 +142,7 @@ export const TELECOM = {
     nodes:        `${apiBase}/nodes`,
     shortestPath: `${apiBase}/graph/shortest-path`,
     benchmark:    `${apiBase}/graph/benchmark`,
+    kPaths:       `${apiBase}/graph/k-paths`,
     history:      `${apiBase}/graph/history`,
   },
   algorithms: [

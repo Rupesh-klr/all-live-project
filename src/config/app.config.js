@@ -24,11 +24,15 @@ export const APP_CONFIG = {
   // Optional extra (e.g. "6+ years", "Open to work"). Empty by default.
   experience: env.VITE_PORTFOLIO_EXPERIENCE || '',
 
+  // Location (optional — shown on the About/résumé page)
+  location:   env.VITE_DEVELOPER_LOCATION || '',
+
   // Links
   apiBaseUrl:   env.VITE_API_BASE_URL || 'http://localhost:5000',
   contactEmail: env.VITE_CONTACT_EMAIL || '',
   githubUrl:    env.VITE_GITHUB_URL || '',
   linkedinUrl:  env.VITE_LINKEDIN_URL || '',
+  resumeUrl:    env.VITE_RESUME_URL || '',
 }
 
 /**

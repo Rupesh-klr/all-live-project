@@ -1,5 +1,7 @@
 # Module: banking-core (Frontend)
 
+> **🔗 Live demo:** https://all-live-project-rupesh-klr.holistichealervedika.com/banking-core
+
 > React · Axios · Table component · Badge component · Modal component
 
 Distributed Banking Core dashboard — account overview, transaction submission with idempotency, and real-time status polling. Demonstrates async fire-and-poll UX for Kafka-backed transactions.

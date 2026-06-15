@@ -1,6 +1,27 @@
-# Portfolio Hub — Frontend
+# 🚀 Portfolio Hub — Frontend
 
+[![Live Demo](https://img.shields.io/badge/Live_Demo-online-22c55e?style=for-the-badge&logo=vercel&logoColor=white)](https://all-live-project-rupesh-klr.holistichealervedika.com/)
+[![React](https://img.shields.io/badge/React_18-20232a?style=for-the-badge&logo=react&logoColor=61DAFB)](#)
+[![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)](#)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](#)
+
+> **🔗 Live:** **https://all-live-project-rupesh-klr.holistichealervedika.com/**
 > React 18 · Vite · Tailwind CSS · Axios · CryptoJS · React Router v6
+
+**A production-grade single-page application** that hosts four live, interactive full-stack
+project dashboards behind one shared, secured authentication layer. Every dashboard is a
+working demo wired to a real backend — **not a screenshot**.
+
+> 💡 **Try it in 10 seconds:** open the live URL → **Try as Guest** → explore any module’s
+> 5-tab dashboard (no sign-up needed).
+
+### Why this stands out
+- **One auth, every module** — single JWT pair, silent token refresh with a request queue, AES-256 password encryption client-side.
+- **Folder-driven architecture** — drop a module folder in and it appears across routes, hub, sidebar, and onboarding automatically; delete it and it vanishes. Mirrors the backend.
+- **Real, interactive demos** — Dijkstra/A* routing, RAG retrieval, async banking settlement, WhatsApp 24h-window messaging — all computing live, with graceful offline fallbacks.
+- **Senior-level polish** — CSS-variable theming (dark/light), reusable component library, ambient module-colored UI, fully responsive.
+
+---
 
 Single-page application that hosts all portfolio module dashboards behind a shared auth layer. One login gives access to every module the user has been granted. The login page scrolls all active backend modules in a live banner pulled from the API.
 

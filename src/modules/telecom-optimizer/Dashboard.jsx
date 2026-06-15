@@ -196,6 +196,21 @@ export function TelecomDashboard() {
     } finally { setBenching(false) }
   }
 
+  // ── Yen's k-shortest (failover routes) ──────────────────────────────────────
+  const [kValue, setKValue]     = useState(3)
+  const [kBusy, setKBusy]       = useState(false)
+  const [kResult, setKResult]   = useState(null)
+
+  async function runKPaths() {
+    setKBusy(true)
+    try {
+      const { data } = await api.post(TELECOM.endpoints.kPaths, { source: benchSrc, target: benchTgt, topologyId, K: kValue })
+      setKResult(data.data)
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'K-paths failed — is the backend running?')
+    } finally { setKBusy(false) }
+  }
+
   // ── History ────────────────────────────────────────────────────────────────
   const [history, setHistory]         = useState([])
   const [histLoading, setHistLoading] = useState(false)
@@ -442,6 +457,62 @@ export function TelecomDashboard() {
                   <p className="text-xs text-[var(--text-muted)]">
                     A* uses a Euclidean heuristic (H_SCALE=3, admissible — guaranteed optimal). Fewer nodes
                     explored means faster termination on larger topologies.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Yen's K-Shortest Paths — backup/failover routes */}
+            <div className="card p-5 space-y-4 mt-4">
+              <div className="flex items-center gap-2">
+                <RouteIcon size={15} style={{ color: TELECOM.color }} />
+                <h3 className="text-sm font-bold text-[var(--text)]">Yen’s K-Shortest Routes</h3>
+                <span className="text-xs text-[var(--text-muted)]">backup / failover route planning</span>
+              </div>
+              <div className="flex flex-wrap items-end gap-3">
+                <div>
+                  <span className="block text-[10px] font-mono uppercase tracking-widest text-[var(--text-muted)] mb-1.5">Routes (K)</span>
+                  <div className="flex rounded-lg border border-[var(--border)] overflow-hidden">
+                    {[2, 3, 4, 5].map(k => (
+                      <button key={k} onClick={() => setKValue(k)}
+                        className={`px-3 py-2 text-xs font-mono transition-colors ${kValue === k ? 'text-white' : 'text-[var(--text-muted)] hover:text-[var(--text)] bg-[var(--bg-2)]'}`}
+                        style={kValue === k ? { background: TELECOM.color } : undefined}>
+                        {k}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <Button icon={GitCompare} loading={kBusy} onClick={runKPaths} style={{ background: TELECOM.color, color: '#fff', border: 'none' }}>
+                  Find {kValue} routes
+                </Button>
+                <span className="font-mono text-[10px] text-[var(--text-muted)] mb-2.5">{benchSrc} → {benchTgt}</span>
+              </div>
+
+              {kResult && (
+                <div className="space-y-2">
+                  {kResult.paths.map(p => (
+                    <div key={p.rank} className="rounded-lg border border-[var(--border)] p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="font-mono text-[10px] px-1.5 py-0.5 rounded text-white" style={{ background: p.rank === 1 ? TELECOM.color : '#64748b' }}>#{p.rank}</span>
+                        <span className="font-mono text-xs text-[var(--text)]">{p.totalLatency}ms</span>
+                        {p.extraLatency > 0
+                          ? <span className="font-mono text-[10px] text-amber-500">+{p.extraLatency}ms vs best</span>
+                          : <span className="font-mono text-[10px] text-green-500">optimal</span>}
+                        <span className="ml-auto font-mono text-[10px] text-[var(--text-muted)]">{p.hops} hops</span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1">
+                        {p.path.map((id, i) => (
+                          <span key={i} className="flex items-center gap-0.5">
+                            <span className="font-mono text-[10px] px-1.5 py-0.5 rounded border" style={{ color: TELECOM.color, borderColor: `${TELECOM.color}40`, background: `${TELECOM.color}10` }}>{id}</span>
+                            {i < p.path.length - 1 && <ArrowRight size={9} className="text-[var(--text-muted)]" />}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Yen’s algorithm returns the {kResult.count} best <em>loopless</em> routes — carriers
+                    pre-provision these as instant failover paths when a primary link degrades.
                   </p>
                 </div>
               )}

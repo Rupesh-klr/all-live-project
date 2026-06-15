@@ -28,6 +28,7 @@ export const BANKING = {
     status:       (id) => `${apiBase}/transactions/${id}/status`,
     riskAlerts:   `${apiBase}/risk/alerts`,
     compliance:   `${apiBase}/compliance`,
+    fxRates:      `${apiBase}/fx/rates`,
   },
   demoAccounts: [
     { id: 'ACC-1001', name: 'Operating Account', currency: 'USD', balance: 184230.55, type: 'checking' },

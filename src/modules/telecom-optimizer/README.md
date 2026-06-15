@@ -1,5 +1,7 @@
 # Telecom Optimizer — Frontend Module (reference pattern)
 
+> **🔗 Live demo:** https://all-live-project-rupesh-klr.holistichealervedika.com/telecom-optimizer
+
 This is the **reference module**. Every other module copies this exact shape. The whole
 frontend is *folder-driven*: this folder registers itself, and if you delete it (or set
 `active: false`), it vanishes from routes, the dashboard sidebar, the hub, and onboarding —

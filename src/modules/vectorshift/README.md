@@ -1,5 +1,7 @@
 # Module: vectorshift (Frontend)
 
+> **🔗 Live demo:** https://all-live-project-rupesh-klr.holistichealervedika.com/vectorshift
+
 > React · Axios · Table component · Modal component · Button component
 
 VectorShift Enterprise RAG Pipeline Builder — UI for creating, managing, and executing Retrieval-Augmented Generation pipelines. Users define a pipeline (source type → vector DB → LLM) and then run natural-language queries through it.
